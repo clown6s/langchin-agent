@@ -19,10 +19,15 @@ def setup_tracing() -> TracerProvider:
     provider = TracerProvider(resource=Resource.create({
         SERVICE_NAME: os.getenv("OTEL_SERVICE_NAME", "langchin-agent"),
     }))
-    endpoint = (os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "") or "").strip()
+    endpoint = (os.getenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT")
+                or os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "") or "").strip()
     if endpoint:
         try:
             from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+            # OTLP HTTP exporter 不会自动补 /v1/traces，必须显式带上，
+            # 否则请求打到根路径而被 collector/tempo 以 404 拒绝。
+            if not endpoint.rstrip("/").endswith("/v1/traces"):
+                endpoint = endpoint.rstrip("/") + "/v1/traces"
             provider.add_span_processor(BatchSpanProcessor(
                 OTLPSpanExporter(endpoint=endpoint, timeout=5)))
         except Exception:
