@@ -1,0 +1,9 @@
+# 构建上下文排除项
+.venv
+.idea
+.git
+__pycache__
+*.pyc
+.env
+.env.example
+*.log

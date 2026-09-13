@@ -2,11 +2,12 @@
 from collections.abc import Callable
 from contextlib import asynccontextmanager
 from dataclasses import replace
+from pathlib import Path
 from uuid import uuid4
 
 import structlog
 from fastapi import Depends, FastAPI, HTTPException, Request, status
-from fastapi.responses import Response, StreamingResponse
+from fastapi.responses import HTMLResponse, Response, StreamingResponse
 from pydantic import BaseModel, Field
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
@@ -19,6 +20,9 @@ from ..observability.tracing import setup_tracing, shutdown_tracing, span
 from .sse import sse
 
 logger = structlog.get_logger(__name__)
+
+# 静态测试页所在目录（本项目根/scripts）。
+_SCRIPT_DIR = Path(__file__).resolve().parents[2] / "scripts"
 
 
 class ChatRequest(BaseModel):
@@ -95,6 +99,12 @@ def create_app(coordinator: ChatCoordinator,
     @app.get("/health")
     async def health():
         return {"status": "ok"}
+
+    @app.get("/test")
+    async def test_page():
+        """流式对话测试页（同源，规避 CORS）。"""
+        page = _SCRIPT_DIR / "chat.html"
+        return HTMLResponse(page.read_text(encoding="utf-8"))
 
     @app.get("/metrics")
     async def metrics_endpoint():
