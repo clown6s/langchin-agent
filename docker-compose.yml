@@ -42,10 +42,7 @@ services:
     command: ["--config", "/etc/otelcol/otel-collector.yml"]
     volumes:
       - ./observability/otel/otel-collector.yml:/etc/otelcol/otel-collector.yml:ro
-    ports:
-      - "14317:4317"   # OTLP gRPC
-      - "14318:4318"   # OTLP HTTP
-      - "18888:8888"   # collector 自身指标
+    # 不对外暴露端口，仅容器内网访问（app→otel-collector:4318）
     restart: unless-stopped
 
   prometheus:
@@ -57,8 +54,7 @@ services:
     volumes:
       - ./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
-    ports:
-      - "9090:9090"
+    # 不对外暴露；Grafana 用内网 http://prometheus:9090 拉数
     restart: unless-stopped
 
   tempo:
@@ -68,8 +64,7 @@ services:
     volumes:
       - ./observability/tempo/tempo.yml:/etc/tempo/tempo.yml:ro
       - tempo_data:/var/tempo
-    ports:
-      - "3200:3200"   # Tempo 查询/UI
+    # 不对外暴露；collector 用内网 http://tempo:4318 转发
     restart: unless-stopped
 
   grafana:
