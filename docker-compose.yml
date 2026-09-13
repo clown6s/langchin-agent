@@ -21,8 +21,10 @@ services:
     ports:
       - "8000:8000"
     environment:
-      # 链路导出到 OTLP Collector（HTTP 4318）
+      # 链路导出到 OTLP Collector（HTTP 4318）。显式给完整 traces 端点，
+      # 避免从 base 推导 /v1/traces 时出现 404。
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: http://otel-collector:4318/v1/traces
       OTEL_SERVICE_NAME: langchin-agent
       # 生产环境：structlog 输出 JSON
       ENV: prod
