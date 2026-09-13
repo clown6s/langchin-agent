@@ -2,10 +2,10 @@
 #
 # 组件：
 #   app             langchin-agent 应用（uvicorn, 读 .env）
-#   otel-collector  OpenTelemetry Collector：收 traces(OTLP) → 送 Tempo
 #   prometheus      抓取 app/metrics 与各组件指标
-#   tempo           分布式链路后端（本地存储）
-#   grafana         可视化（Prometheus + Tempo 数据源，预置仪表盘）
+#   tempo           分布式链路后端（app 直连 OTLP http :4318）
+#   loki + promtail 采集 app 容器日志
+#   grafana         可视化（Prometheus + Tempo + Loki 数据源，预置仪表盘）
 #
 # 启动：  docker compose up -d --build
 # 访问：  app  :8000  |  Grafana :3000（admin/admin）  |  Prometheus :9090  |  Tempo :3200
@@ -21,10 +21,8 @@ services:
     ports:
       - "8000:8000"
     environment:
-      # 链路导出到 OTLP Collector（HTTP 4318）。显式给完整 traces 端点，
-      # 避免从 base 推导 /v1/traces 时出现 404。
-      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
-      OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: http://otel-collector:4318/v1/traces
+      # 链路直连 Tempo（OTLP HTTP /v1/traces）
+      OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: http://tempo:4318/v1/traces
       OTEL_SERVICE_NAME: langchin-agent
       # 生产环境：structlog 输出 JSON
       ENV: prod
@@ -32,17 +30,6 @@ services:
     volumes:
       # 应用配置（含 LC_* 连接凭据）挂进容器
       - ./.env:/app/.env:ro
-    depends_on:
-      - otel-collector
-    restart: unless-stopped
-
-  otel-collector:
-    image: otel/opentelemetry-collector-contrib:0.133.0
-    container_name: otel-collector
-    command: ["--config", "/etc/otelcol/otel-collector.yml"]
-    volumes:
-      - ./observability/otel/otel-collector.yml:/etc/otelcol/otel-collector.yml:ro
-    # 不对外暴露端口，仅容器内网访问（app→otel-collector:4318）
     restart: unless-stopped
 
   prometheus:
@@ -67,6 +54,27 @@ services:
     # 不对外暴露；collector 用内网 http://tempo:4318 转发
     restart: unless-stopped
 
+  loki:
+    image: grafana/loki:3.4.2
+    container_name: loki
+    command: ["-config.file=/etc/loki/loki.yml"]
+    volumes:
+      - ./observability/loki/loki.yml:/etc/loki/loki.yml:ro
+      - loki_data:/loki
+    # 不对外暴露；grafana/promtail 内网 http://loki:3100
+    restart: unless-stopped
+
+  promtail:
+    image: grafana/promtail:3.4.2
+    container_name: promtail
+    command: ["-config.file=/etc/promtail/config.yml"]
+    volumes:
+      - ./observability/loki/promtail.yml:/etc/promtail/config.yml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on:
+      - loki
+    restart: unless-stopped
+
   grafana:
     image: grafana/grafana:12.1.1
     container_name: grafana
@@ -84,9 +92,11 @@ services:
     depends_on:
       - prometheus
       - tempo
+      - loki
     restart: unless-stopped
 
 volumes:
   prometheus_data:
   tempo_data:
   grafana_data:
+  loki_data:

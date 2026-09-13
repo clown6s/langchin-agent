@@ -67,6 +67,19 @@
           "legendFormat": "{{status}}"
         }
       ]
+    },
+    {
+      "id": 6,
+      "type": "logs",
+      "title": "应用日志（Loki）",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "expr": "{container=\"langchin-agent\"}",
+          "refId": "A"
+        }
+      ]
     }
   ]
 }
