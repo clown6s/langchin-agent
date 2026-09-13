@@ -1,0 +1,1 @@
+"""HTTP 接口层。只依赖 application 编排用例与 domain 模型。"""
