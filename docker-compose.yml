@@ -55,7 +55,7 @@ services:
     restart: unless-stopped
 
   loki:
-    image: grafana/loki:3.4.2
+    image: grafana/loki:3.5.0
     container_name: loki
     command: ["-config.file=/etc/loki/loki.yml"]
     volumes:
@@ -65,7 +65,7 @@ services:
     restart: unless-stopped
 
   promtail:
-    image: grafana/promtail:3.4.2
+    image: grafana/promtail:3.5.0
     container_name: promtail
     command: ["-config.file=/etc/promtail/config.yml"]
     volumes:
