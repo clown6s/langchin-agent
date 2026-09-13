@@ -11,8 +11,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # 拷贝源码（.dockerignore 已排除 .venv/.idea 等）
 COPY app ./app
-COPY db ./db
-COPY scripts ./scripts
 
 EXPOSE 8000
 
