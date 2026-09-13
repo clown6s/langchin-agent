@@ -75,7 +75,9 @@ def create_app(coordinator: ChatCoordinator,
             raise
         response.headers["X-Trace-Id"] = trace_id
         metrics.http_requests_total.labels(str(response.status_code)).inc()
-        logger.info("request_completed", status_code=response.status_code)
+        # 监控抓取/探活路径（/metrics、/health）跳过访问日志，避免刷屏。
+        if request.url.path not in ("/metrics", "/health"):
+            logger.info("request_completed", status_code=response.status_code)
         return response
 
     @app.post("/chat")
