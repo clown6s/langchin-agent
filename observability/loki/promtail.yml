@@ -15,11 +15,11 @@ scrape_configs:
       - host: unix:///var/run/docker.sock
         refresh_interval: 5s
     relabel_configs:
-      # 只采集我们的应用容器（container_name=langchin-agent）
+      # 只采集我们的应用容器（docker 容器名带前导斜杠，如 /langchin-agent）
       - source_labels: ['__meta_docker_container_name']
-        regex: 'langchin-agent'
+        regex: '.*langchin-agent.*'
         action: keep
-      # 用容器名作为日志标签，方便 Grafana 按容器过滤
+      # 用容器名作日志标签（去掉可选前导斜杠）
       - source_labels: ['__meta_docker_container_name']
-        regex: '/(.*)'
+        regex: '(?:/)?(langchin-agent)'
         target_label: container
