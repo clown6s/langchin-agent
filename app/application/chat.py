@@ -188,7 +188,7 @@ class ChatCoordinator:
         tool_results = summary.get("tool_results") or {}
         logger.info("chat_stream_agent", conversation_id=conversation_id,
                     trace_id=context.trace_id, used_tools=used_tools,
-                    answer_preview=answer[:200])
+                    answer_full=answer)
 
         # 工具内部生成的答案（无 token 流）时，整段补发。
         if not streamed_any and answer:

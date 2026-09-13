@@ -5,126 +5,136 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>langchin-agent · 流式对话测试</title>
 <style>
-  :root { --bg:#0f1420; --panel:#171e2e; --line:#2a3350; --fg:#e6ecff;
-          --muted:#8a94b0; --accent:#4f8cff; --ok:#3ecf8e; --warn:#ffb648; --err:#ff6b6b; }
+  :root {
+    --bg:#f4f6fb; --card:#ffffff; --border:#e3e8f2; --line:#eef1f7;
+    --fg:#1c2536; --muted:#6b7690; --brand:#3b6fe0;
+    --brand-weak:#eaf0ff; --ok:#16a34a; --ok-weak:#e8f7ee;
+    --warn:#b45309; --warn-weak:#fef3e2; --err:#dc2626;
+    --code-bg:#f7f9fd;
+  }
   * { box-sizing:border-box; }
   body { margin:0; background:var(--bg); color:var(--fg);
-         font:14px/1.6 "SF Mono",Consolas,"Courier New",monospace; }
-  .wrap { max-width:860px; margin:32px auto; padding:0 16px; }
-  h1 { font-size:18px; margin:0 0 4px; }
-  .sub { color:var(--muted); margin:0 0 16px; font-size:12px; }
-  .card { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:14px; }
-  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:10px; }
-  label { color:var(--muted); font-size:12px; }
-  input[type=text], input[type=password] {
-    background:#0c1220; border:1px solid var(--line); color:var(--fg);
-    border-radius:6px; padding:7px 10px; font:inherit; flex:1; min-width:140px; }
-  button { background:var(--accent); color:#fff; border:0; border-radius:6px;
-           padding:8px 14px; font:inherit; cursor:pointer; }
-  button:hover { filter:brightness(1.1); }
-  button.secondary { background:#2a3350; }
-  button.danger { background:#7a3a4a; }
-  button:disabled { opacity:.5; cursor:not-allowed; }
-  #out { background:#0c1220; border:1px solid var(--line); border-radius:8px;
-         height:420px; overflow:auto; padding:12px; white-space:pre-wrap;
-         word-break:break-word; font-size:13px; }
-  .status { color:var(--muted); font-style:italic; }
-  .tool   { color:var(--warn); }
-  .token  { color:var(--fg); }
-  .answer { color:var(--ok); border-top:1px dashed var(--line); margin-top:6px; padding-top:6px; }
-  .done   { color:var(--accent); }
-  .err    { color:var(--err); }
-  .meta   { color:var(--muted); font-size:12px; margin-top:8px; }
+    font:14px/1.65 -apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif; }
+  .wrap { max-width:900px; margin:0 auto; padding:32px 24px 60px; }
+
+  header { display:flex; align-items:center; gap:12px; margin-bottom:6px; }
+  header .logo { width:34px; height:34px; border-radius:10px;
+    background:linear-gradient(135deg,#4f8cff,#6a5cff);
+    display:flex; align-items:center; justify-content:center; font-size:18px; color:#fff; }
+  header h1 { font-size:20px; margin:0; font-weight:700; }
+  header .badge { font-size:11px; color:var(--brand); background:var(--brand-weak);
+    border:1px solid #c9d8ff; padding:2px 9px; border-radius:20px; font-weight:500; }
+  .sub { color:var(--muted); font-size:13px; margin:4px 0 20px; }
+
+  .card { background:var(--card); border:1px solid var(--border); border-radius:14px;
+    padding:18px 20px; box-shadow:0 4px 20px rgba(30,45,90,.06); }
+
+  .field { margin-bottom:14px; }
+  .field label { display:block; font-size:12px; color:var(--muted); margin-bottom:6px; font-weight:500; }
+  input[type=password], input[type=text] {
+    width:100%; background:#fff; border:1px solid var(--border); color:var(--fg);
+    border-radius:9px; padding:10px 12px; font:inherit; outline:none; transition:border-color .15s, box-shadow .15s; }
+  input:focus { border-color:var(--brand); box-shadow:0 0 0 3px rgba(59,111,224,.12); }
+  input::placeholder { color:#b3bcd0; }
+
+  .row { display:flex; gap:10px; }
+  .row input { flex:1; }
+
+  .actions { display:flex; gap:10px; margin-top:4px; }
+  button { border:0; border-radius:9px; padding:11px 22px; font:inherit; font-weight:600;
+    cursor:pointer; transition:filter .15s; flex:1; }
+  button.send { background:var(--brand); color:#fff; }
+  button.send:hover { filter:brightness(1.08); }
+  button.stop { background:#f0f2f7; color:var(--muted); border:1px solid var(--border); }
+  button.stop:hover { color:var(--err); border-color:#f0c4c4; }
+  button:disabled { opacity:.5; cursor:not-allowed; filter:none; }
+
+  .hint { font-size:12px; color:var(--muted); margin-top:12px; }
+  .hint code { background:var(--code-bg); padding:1px 6px; border-radius:4px; color:var(--brand); }
+
+  .output { background:var(--card); border:1px solid var(--border); border-radius:14px;
+    min-height:420px; max-height:60vh; overflow:auto; padding:18px 20px; margin-top:16px;
+    white-space:pre-wrap; word-break:break-word; font:13px/1.75 "SF Mono",Consolas,"Courier New",monospace; }
+  .output .ph { color:#b3bcd0; font-style:italic; }
+  .status { color:var(--muted); font-size:12.5px; }
+  .status .arrow { color:var(--brand); font-weight:700; }
+  .tool { color:var(--warn); background:var(--warn-weak); border-radius:4px; padding:1px 5px; font-size:12px; }
+  .answer { color:#0f1a30; }
+  .answer .divider { display:block; color:var(--brand); font-weight:600; margin:10px 0 6px; }
+  .done { color:var(--ok); font-size:12.5px; }
+  .err { color:var(--err); }
+  .meta { color:var(--muted); font-size:12px; margin-top:12px; }
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>🦊 langchin-agent · 流式对话测试</h1>
-  <p class="sub">POST /chat → SSE（status / token / answer_text / done）实时渲染。页面与应用同源，无需 CORS。</p>
+  <header>
+    <div class="logo">🦊</div>
+    <h1>langchin-agent</h1>
+    <span class="badge">流式对话 · SSE</span>
+  </header>
+  <p class="sub">POST /chat 流式回答测试。填好 Token 即可开始，状态与答案实时显示。</p>
 
   <div class="card">
     <div class="row">
-      <label>Token</label>
-      <input type="password" id="token" placeholder="粘贴 Bearer token（或点“登录获取”）">
-      <button class="secondary" id="loginBtn" type="button">登录获取</button>
+      <input type="text" id="question" placeholder="输入问题，例如：宣告缓刑的条件是什么？" style="flex:3">
+      <input type="text" id="conv" value="demo-1" placeholder="会话ID" style="flex:1">
     </div>
-    <div class="row">
-      <label>账号</label>
-      <input type="text" id="username" placeholder="admin" style="flex:0 1 140px">
-      <label>密码</label>
-      <input type="password" id="password" placeholder="abc123" style="flex:0 1 140px">
+    <div class="actions">
+      <button class="send" id="send">发送</button>
+      <button class="stop" id="stop" disabled>停止</button>
     </div>
-    <div class="row">
-      <input type="text" id="question" placeholder="输入问题，例如：怎么同时解决同义词和漏词的问题？">
-      <button id="send" type="button">发送</button>
-      <button class="danger" id="stop" type="button" disabled>停止</button>
-    </div>
-    <div class="row" style="margin-bottom:0">
-      <label>会话ID</label>
-      <input type="text" id="conv" value="demo-1" style="flex:0 1 160px">
-    </div>
+    <div class="hint">Token 已在 <code>chat.html</code> 的 <code>TOKEN</code> 常量里配置。</div>
   </div>
 
-  <div id="out" style="margin-top:12px">// 点“发送”开始，流式内容将实时显示在这里…</div>
-  <div id="meta" class="meta"></div>
+  <div class="output" id="out"><span class="ph">// 点“发送”开始，状态与答案将实时显示…</span></div>
+  <div class="meta" id="meta"></div>
 </div>
 
 <script>
+// ★★★ 在这里填写你的 token ★★★
+// 生成方式：POST /auth/login → access_token，或 docker exec app python -c "..."
+const TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbiIsInBlcm1pc3Npb25zIjpbImNoYXQ6YXNrIl0sInJvbGVzIjpbImFkbWluIl0sImlhdCI6MTc4OTM0MDgwNSwiZXhwIjoxNzg5MzQ0NDA1fQ.ZtlhO0URQdGOE4mOsu6doYbOem1MJYiJTFWnZ8QMLMI";   // ← 填这里
 const $ = id => document.getElementById(id);
 const out = $('out'), meta = $('meta');
 let controller = null;
 
-function append(cls, text) {
-  const span = document.createElement('span');
-  span.className = cls;
-  span.textContent = text;
-  out.appendChild(span);
-  out.scrollTop = out.scrollHeight;
+function outBox(cls) {
+  let el = out.lastElementChild;
+  if (!el || el.className !== cls) { el = document.createElement('div'); el.className = cls; out.appendChild(el); }
+  return el;
 }
-function setMeta(html) { meta.innerHTML = html; }
-
-async function login() {
-  const u = $('username').value || 'admin', p = $('password').value || 'abc123';
-  const r = await fetch('/auth/login', {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({username:u, password:p})
-  });
-  const j = await r.json();
-  if (!r.ok) { append('err', '\n[登录失败] ' + (j.detail || r.status)); return; }
-  $('token').value = j.access_token;
-  append('status', '\n[登录成功] user=' + j.user_id);
-}
+function scrollDown() { out.scrollTop = out.scrollHeight; }
 
 function handle(evt) {
   switch (evt.type) {
     case 'status':
-      append('status', '\n▸ [' + (evt.stage||'') + '] ' + (evt.message||''));
-      break;
-    case 'token':
-      append('token', evt.content);  // 逐字追加
+      outBox('status').textContent += '\n' + (evt.message || evt.stage || '');
+      scrollDown();
       break;
     case 'answer_text':
-      append('answer', '\n┌── 工具答案 ──\n' + evt.text + '\n└──────────');
+      const a = outBox('answer');
+      a.textContent += '\n<span class="divider">──────────────── 回答 ────────────────</span>\n' + evt.text;
+      scrollDown();
       break;
     case 'done':
-      append('done', '\n✅ done  used_tools=' + JSON.stringify(evt.used_tools) +
-             '  conversation_id=' + evt.conversation_id);
-      setMeta('完成：' + evt.conversation_id + ' · 工具：' + JSON.stringify(evt.used_tools));
+      outBox('done').textContent += '\n✅ 完成 · 工具：' + JSON.stringify(evt.used_tools) + ' · 会话：' + evt.conversation_id;
+      setMeta('工具：' + JSON.stringify(evt.used_tools) + ' · 会话：' + evt.conversation_id);
+      scrollDown();
       break;
     default:
-      append('status', '\n? ' + JSON.stringify(evt));
+      outBox('status').textContent += '\n? ' + JSON.stringify(evt);
   }
 }
 
 async function send() {
-  const token = $('token').value.trim();
-  if (!token) { append('err', '\n[缺少 Token] 请先粘贴或“登录获取”'); return; }
+  const token = TOKEN.trim();
+  if (!token || token.includes('在这里粘贴')) { alert('请先在 chat.html 的 TOKEN 常量里填写 access_token'); return; }
   const question = $('question').value.trim();
   if (!question) return;
   controller = new AbortController();
   $('send').disabled = true; $('stop').disabled = false;
   out.textContent = ''; meta.textContent = '';
-  append('status', '▶ 请求 /chat …');
   const started = Date.now();
   try {
     const resp = await fetch('/chat', {
@@ -135,7 +145,7 @@ async function send() {
     });
     if (!resp.ok) {
       const t = await resp.text();
-      append('err', '\n[HTTP ' + resp.status + '] ' + t.slice(0,300));
+      outBox('err').textContent += '\n[HTTP ' + resp.status + '] ' + t.slice(0,300);
       return;
     }
     const reader = resp.body.getReader();
@@ -151,13 +161,13 @@ async function send() {
         const line = frame.trim();
         if (!line.startsWith('data: ')) continue;
         try { handle(JSON.parse(line.slice(6))); }
-        catch(e) { append('err', '\n[解析错误] ' + line.slice(0,200)); }
+        catch(e) { outBox('err').textContent += '\n[解析错误] ' + line.slice(0,120); }
       }
     }
-    append('meta', '耗时 ' + ((Date.now()-started)/1000).toFixed(1) + 's');
+    setMeta((meta.textContent ? meta.textContent + ' · ' : '') + '耗时 ' + ((Date.now()-started)/1000).toFixed(1) + 's');
   } catch (e) {
-    if (e.name === 'AbortError') append('status', '\n⏹ 已停止');
-    else append('err', '\n[网络错误] ' + e.message);
+    if (e.name === 'AbortError') outBox('status').textContent += '\n⏹ 已停止';
+    else outBox('err').textContent += '\n[网络错误] ' + e.message;
   } finally {
     $('send').disabled = false; $('stop').disabled = true; controller = null;
   }
@@ -165,7 +175,7 @@ async function send() {
 
 $('send').onclick = send;
 $('stop').onclick = () => controller && controller.abort();
-$('loginBtn').onclick = login;
+$('question').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); send(); } });
 </script>
 </body>
 </html>

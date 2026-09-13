@@ -182,13 +182,9 @@ class LangGraphAgent:
 
         for ctype, chunk in app.stream(initial, stream_mode=["messages", "updates"]):
             if ctype == "messages":
-                msg, _meta = chunk
-                # 跳过工具调用的参数增量，只透出正文 token。
-                if getattr(msg, "tool_call_chunks", None):
-                    continue
-                content = getattr(msg, "content", None) or ""
-                if content:
-                    yield {"type": "token", "content": content}
+                # decide 节点在决策时也会生成内容（可能带工具调用参数、甚至残留 JSON）。
+                # 这些是中间噪音，不是最终答案，一律不透出；最终答案统一由收尾的
+                # answer_text 事件给出，避免重复与垃圾。
                 continue
             # updates：{node: update}
             for node, upd in chunk.items():
@@ -231,8 +227,10 @@ class LangGraphAgent:
             "判断原则：\n"
             "- 用户在问业务数据且对得上已登记域 → 调 query_data。\n"
             "- 用户在咨询/办理已登记流程 → 调 guide_sop。\n"
-            "- 问题基于企业文档/制度 → 调 retrieve_enterprise。\n"
-            "- 法规、技术、常识、闲聊、或对不上任何已登记能力 → 不调用工具，直接给出简洁准确的回答。\n"
+            "- 其余所有问题（企业文档/制度/法规/技术/常识/闲聊等）→ 一律调 retrieve_enterprise"
+            " 检索企业知识库回答，禁止用自己的知识直接作答。\n"
+            "- 如果检索不到或知识库未收录相关内容，就如实回答"
+            "『企业知识库未收录相关内容，无法回答。』，不要凭常识补充。\n"
             "可参考的已登记域/流程信息：\n" + grounding_text
         )
 
