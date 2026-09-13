@@ -34,3 +34,26 @@ def instrument_llm(llm, messages, *, kind: str):
     finally:
         llm_duration_seconds.labels(kind).observe(perf_counter() - started)
 
+
+def instrument_llm_stream(llm, messages, *, kind: str):
+    """Invoke ``llm`` via streaming, accumulating into a full message.
+
+    与 instrument_llm 等价，但用 llm.stream 逐块累加，使 LangGraph
+    stream_mode=\"messages\" 能捕获 token 增量。调用点每处只记一次指标。
+    """
+    started = perf_counter()
+    try:
+        with span("llm.invoke", kind=kind,
+                  model=getattr(llm, "model_name", None) or ""):
+            full = None
+            for chunk in llm.stream(messages):
+                full = chunk if full is None else full + chunk
+            result = full
+        llm_requests_total.labels(kind, "success").inc()
+        return result
+    except Exception:
+        llm_requests_total.labels(kind, "error").inc()
+        raise
+    finally:
+        llm_duration_seconds.labels(kind).observe(perf_counter() - started)
+

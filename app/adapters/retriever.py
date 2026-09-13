@@ -17,7 +17,7 @@ class LegacyRetrieverAdapter(KnowledgeRetriever):
         self._filter_fn = filter_fn
 
     def retrieve(self, query: str, *, top_k: int = 5,
-                 context: RequestContext) -> list[tuple[str, str, float]]:
+                 context: RequestContext) -> list[tuple[str, str, str, float]]:
         k = top_k or self._top_k
         # 过滤表达式由部署方提供（旧检索器 filter 语法因存储而异）。
         filter_expr = ""
@@ -25,7 +25,9 @@ class LegacyRetrieverAdapter(KnowledgeRetriever):
             filter_expr = self._filter_fn(context) or ""
         results = self._inner.execute_hybrid(query, top_k=k, filter=filter_expr)
         return [
-            (item.text, item.document_id, float(item.score))
+            (item.text, item.document_id,
+             getattr(item, "chunk_id", "") or item.document_id,
+             float(item.score))
             for item in results
         ]
 

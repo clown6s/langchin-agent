@@ -6,7 +6,7 @@ from uuid import uuid4
 
 import structlog
 from fastapi import Depends, FastAPI, HTTPException, Request, status
-from fastapi.responses import Response
+from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel, Field
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
@@ -16,6 +16,7 @@ from ..observability import metrics
 from ..observability.logging import close_logging, setup_logging
 from ..observability.trace_context import resolve_trace_id
 from ..observability.tracing import setup_tracing, shutdown_tracing, span
+from .sse import sse
 
 logger = structlog.get_logger(__name__)
 
@@ -73,7 +74,7 @@ def create_app(coordinator: ChatCoordinator,
         logger.info("request_completed", status_code=response.status_code)
         return response
 
-    @app.post("/chat", response_model=ChatResponse)
+    @app.post("/chat")
     async def chat(req: ChatRequest,
                    request: Request,
                    context: RequestContext = Depends(context_provider)):
@@ -83,10 +84,13 @@ def create_app(coordinator: ChatCoordinator,
         domain_request = DomainChatRequest(
             question=req.question, conversation_id=req.conversation_id,
             confirmed=req.confirmed, context=context)
-        out = coordinator.ask(domain_request)
-        return ChatResponse(answer=out.text, status=out.status,
-                            used_tools=list(out.used_tools),
-                            conversation_id=req.conversation_id)
+
+        def event_stream():
+            for evt in coordinator.ask_stream(domain_request):
+                yield sse(evt)
+
+        return StreamingResponse(event_stream(),
+                                 media_type="text/event-stream")
 
     @app.get("/health")
     async def health():

@@ -32,7 +32,8 @@ class HybridRetriever:
 
     def retrieve(self, query: str, *, top_k: int = 5,
                  context: RequestContext | None = None,
-                 allowed_document_ids=None) -> list[tuple[str, str, float]]:
+                 allowed_document_ids=None) -> list[tuple[str, str, str, float]]:
+        """返回 (text, document_id, chunk_id, score) 四元组列表。"""
         if not query.strip():
             return []
         limit = min(max(1, top_k or self._top_k), self._top_k)
@@ -58,11 +59,13 @@ class HybridRetriever:
                 by_index = {i: hit for i, (hit, _) in enumerate(results)}
                 return [(by_index.get(i, results[min(i, len(results)-1)][0]).text,
                          by_index.get(i, results[min(i, len(results)-1)][0]).document_id,
+                         by_index.get(i, results[min(i, len(results)-1)][0]).chunk_id,
                          score)
                         for i, score in ranked]
             except Exception:
                 pass
-        return [(hit.text, hit.document_id, score) for hit, score in results]
+        return [(hit.text, hit.document_id, hit.chunk_id, score)
+                for hit, score in results]
 
     def _run_parallel(self, query, recall_k, allowed_document_ids=None):
         def dense():

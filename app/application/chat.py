@@ -3,6 +3,7 @@
 API 层只调用这里；本层依赖 domain 端口与 agent，不依赖框架细节。
 """
 from time import perf_counter
+from typing import Iterator
 import structlog
 
 from ..domain.models import (AgentAnswer, ChatMessage, ChatRequest,
@@ -115,6 +116,106 @@ class ChatCoordinator:
                     payload={"used_tools": list(out["used_tools"])})
         metrics.agent_requests_total.labels("answered").inc()
         return answer
+
+    def ask_stream(self, request: ChatRequest) -> Iterator[dict]:
+        """流式编排：产出 status/token/done 事件，agent 逐 token 出答案。"""
+        started = perf_counter()
+        conversation_id = request.conversation_id
+        context = request.context
+        question = request.question
+        self._audit(stage="request", status="started", context=context,
+                    conversation_id=conversation_id, payload={"question": question})
+        metrics.agent_requests_total.labels("started").inc()
+        logger.info("chat_stream_start", conversation_id=conversation_id,
+                    user_id=context.user_id, trace_id=context.trace_id,
+                    question=question)
+        try:
+            yield from self._ask_stream_impl(request)
+        except Exception:
+            self._audit(stage="request", status="error", context=context,
+                        conversation_id=conversation_id, payload={})
+            metrics.agent_requests_total.labels("error").inc()
+            logger.exception("chat_stream_failed", conversation_id=conversation_id,
+                             trace_id=context.trace_id)
+            raise
+        finally:
+            duration = perf_counter() - started
+            logger.info("chat_stream_done", conversation_id=conversation_id,
+                        user_id=context.user_id, trace_id=context.trace_id,
+                        duration_ms=int(duration * 1000))
+
+    def _ask_stream_impl(self, request: ChatRequest) -> Iterator[dict]:
+        conversation_id = request.conversation_id
+        context = request.context
+        question = request.question
+        self._conversation.get_or_create(conversation_id, context=context)
+        history = self._conversation.recent(conversation_id, context=context)
+        state = self._sessions.get(conversation_id, context=context)
+
+        # 1) 会话理解。
+        yield {"type": "status", "stage": "understand", "message": "正在理解问题…"}
+        turn = self._understanding.understand(question, context=context, state=state)
+        condensed = turn.question or question
+        logger.info("chat_stream_understood", conversation_id=conversation_id,
+                    trace_id=context.trace_id, condensed_question=condensed,
+                    relation=turn.relation, inheritable=turn.inheritable)
+        if turn.needs_clarification:
+            self._audit(stage="request", status="clarification", context=context,
+                        conversation_id=conversation_id, payload={})
+            metrics.agent_requests_total.labels("clarification").inc()
+            yield {"type": "answer_text", "text": "请补充你的问题。"}
+            yield {"type": "done", "used_tools": [], "conversation_id": conversation_id}
+            return
+
+        # 2) 绑定上下文并流式运行 Agent。
+        state_ctx = ConversationState(
+            last_intent="agent",
+            last_domain=state.inheritable_domain() if (state and turn.inheritable) else None,
+            history=tuple(history[-8:]),
+            extra={**(state.extra if state else {}), "last_question": question,
+                   "topic": question[:120]},
+        )
+        self._agent.bind_context(context, state=state_ctx)
+        yield {"type": "status", "stage": "decide", "message": "正在生成回答…"}
+        streamed_any = False
+        for evt in self._agent.stream_events(condensed):
+            yield evt
+            if evt.get("type") == "token":
+                streamed_any = True
+        summary = getattr(self._agent, "_last_stream_result", None) or {}
+        answer = (summary.get("answer") or "").strip()
+        used_tools = list(summary.get("used_tools") or [])
+        tool_results = summary.get("tool_results") or {}
+        logger.info("chat_stream_agent", conversation_id=conversation_id,
+                    trace_id=context.trace_id, used_tools=used_tools,
+                    answer_preview=answer[:200])
+
+        # 工具内部生成的答案（无 token 流）时，整段补发。
+        if not streamed_any and answer:
+            yield {"type": "answer_text", "text": answer}
+
+        # 3) 持久化会话与 SOP 状态。
+        sop_state = self._extract_sop_state(tool_results,
+                                            state if state else None)
+        self._conversation.append(conversation_id,
+                                  ChatMessage("user", question), context=context)
+        self._conversation.append(conversation_id,
+                                  ChatMessage("assistant", answer), context=context)
+        new_state = ConversationState(
+            last_intent="agent", last_domain=state_ctx.last_domain,
+            current_sop_id=sop_state["sop_id"],
+            current_sop_version=sop_state["sop_version"],
+            current_step_id=sop_state["step_id"],
+            history=tuple(self._conversation.recent(conversation_id, context=context)[-8:]),
+            extra={"last_question": question, "topic": condensed[:120],
+                   "used_tools": used_tools},
+        )
+        self._sessions.save(conversation_id, new_state, context=context)
+        self._audit(stage="request", status="answered", context=context,
+                    conversation_id=conversation_id, payload={"used_tools": used_tools})
+        metrics.agent_requests_total.labels("answered").inc()
+        yield {"type": "done", "used_tools": used_tools,
+               "conversation_id": conversation_id}
 
     @staticmethod
     def _extract_sop_state(tool_results: dict, prev: ConversationState | None) -> dict:

@@ -4,7 +4,7 @@
 LLM 直接产出文本答案（法规/技术/常识/追问），不再需要意图分类器。
 """
 import operator
-from typing import Annotated, TypedDict
+from typing import Annotated, Iterator, TypedDict
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from langgraph.graph import END, StateGraph
@@ -58,7 +58,7 @@ class LangGraphAgent:
                 return {"messages": [AIMessage(content="无法在安全限制内完成查询。")],
                         "iterations": 1}
             llm = self._llm.bind_tools([t for t in self._tools()])
-            resp = metrics.instrument_llm(llm, state["messages"], kind="agent")
+            resp = metrics.instrument_llm_stream(llm, state["messages"], kind="agent")
             return {"messages": [resp], "iterations": 1}
 
         def run_tool(state: AgentState):
@@ -161,6 +161,62 @@ class LangGraphAgent:
             tool_results[item.get("name")] = item
         return {"answer": answer, "used_tools": result.get("used_tools", []),
                 "tool_results": tool_results}
+
+    def stream_events(self, condensed_question: str) -> Iterator[dict]:
+        """流式运行一次 Agent，产出事件 dict（status/token）。
+
+        - status: 节点跳转与工具调用；token: LLM 正文增量（跳过工具调用参数）。
+        - 运行结束后，汇总结果存到 self._last_stream_result，供编排层持久化。
+        """
+        system = SystemMessage(self._system_prompt())
+        human = HumanMessage(f"用户问题：\n{condensed_question}")
+        app = self._graph().compile()
+        initial = {"condensed_question": condensed_question,
+                   "messages": [system, human], "used_tools": [],
+                   "tool_results": [], "iterations": 0}
+
+        used_tools: list[str] = []
+        tool_results: dict[str, dict] = {}
+        final_answer = ""
+        self._last_stream_result = None
+
+        for ctype, chunk in app.stream(initial, stream_mode=["messages", "updates"]):
+            if ctype == "messages":
+                msg, _meta = chunk
+                # 跳过工具调用的参数增量，只透出正文 token。
+                if getattr(msg, "tool_call_chunks", None):
+                    continue
+                content = getattr(msg, "content", None) or ""
+                if content:
+                    yield {"type": "token", "content": content}
+                continue
+            # updates：{node: update}
+            for node, upd in chunk.items():
+                if node == "tools" and isinstance(upd, dict):
+                    used_tools = upd.get("used_tools", used_tools)
+                    for item in upd.get("tool_results", []):
+                        tool_results[item.get("name")] = item
+                    yield {"type": "status", "stage": "tools",
+                           "message": f"调用工具：{', '.join(upd.get('used_tools') or [])}"}
+                elif node == "retrieve":
+                    yield {"type": "status", "stage": "retrieve",
+                           "message": "正在检索企业知识库…"}
+                elif node == "finish":
+                    final_answer = (upd or {}).get("final_answer", "") or final_answer
+                elif node == "decide":
+                    yield {"type": "status", "stage": "decide",
+                           "message": "正在理解并决策…"}
+
+        if not final_answer:
+            general = self._general_uc
+            if getattr(general, "_llm", None) is not None:
+                final_answer = general.answer(
+                    condensed_question, context=self._context).text
+        self._last_stream_result = {
+            "answer": (final_answer or "").strip(),
+            "used_tools": used_tools,
+            "tool_results": tool_results,
+        }
 
     def _system_prompt(self) -> str:
         grounding_text = self._grounding_text

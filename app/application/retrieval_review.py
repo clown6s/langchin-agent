@@ -21,8 +21,9 @@ class RetrievalReviewUseCase:
         if isinstance(top_k, bool) or not isinstance(top_k, int) or not 1 <= top_k <= 100:
             raise ValueError("top_k 必须是 1 到 100 之间的整数")
         rows = self._retriever.retrieve(query.strip(), top_k=top_k, context=None)
-        candidates = [{"rank": i, "text": text, "document_id": doc, "score": score}
-                      for i, (text, doc, score) in enumerate(rows, 1)]
+        candidates = [{"rank": i, "text": text, "document_id": doc,
+                       "chunk_id": cid, "score": score}
+                      for i, (text, doc, cid, score) in enumerate(rows, 1)]
         return {"id": self.case_id(query.strip()), "query": query.strip(),
                 "candidate_k": top_k, "candidates": candidates}
 

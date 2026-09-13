@@ -48,9 +48,9 @@ class SopService(Protocol):
 
 
 class KnowledgeRetriever(Protocol):
-    """企业知识检索端口。"""
+    """企业知识检索端口。返回 (text, document_id, chunk_id, score) 四元组列表。"""
     def retrieve(self, query: str, *, top_k: int = 5,
-                 context: RequestContext) -> list[tuple[str, str, float]]: ...
+                 context: RequestContext) -> list[tuple[str, str, str, float]]: ...
     def close(self) -> None: ...
 
 
