@@ -43,9 +43,9 @@ services:
     volumes:
       - ./observability/otel/otel-collector.yml:/etc/otelcol/otel-collector.yml:ro
     ports:
-      - "4317:4317"   # OTLP gRPC
-      - "4318:4318"   # OTLP HTTP
-      - "8888:8888"   # collector 自身指标
+      - "14317:4317"   # OTLP gRPC
+      - "14318:4318"   # OTLP HTTP
+      - "18888:8888"   # collector 自身指标
     restart: unless-stopped
 
   prometheus:
