@@ -1,0 +1,29 @@
+# Web 框架
+fastapi
+uvicorn[standard]
+pydantic
+pydantic-settings
+
+# LLM / Agent
+langchain-core
+langchain-openai
+langgraph
+
+# 数据库 / SQL
+pymysql
+sqlglot
+
+# RAG / 外部调用
+httpx
+elasticsearch
+pymilvus
+
+# 认证
+PyJWT
+
+# 可观测性
+structlog
+prometheus-client
+opentelemetry-api
+opentelemetry-sdk
+opentelemetry-exporter-otlp-proto-http
