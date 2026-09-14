@@ -64,16 +64,16 @@ services:
     # 不对外暴露；grafana/promtail 内网 http://loki:3100
     restart: unless-stopped
 
-  promtail:
-    image: grafana/promtail:3.5.0
-    container_name: promtail
-    command: ["-config.file=/etc/promtail/config.yml"]
-    volumes:
-      - ./observability/loki/promtail.yml:/etc/promtail/config.yml:ro
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-    depends_on:
-      - loki
-    restart: unless-stopped
+  # promtail:
+  #   image: grafana/promtail:3.5.0
+  #   container_name: promtail
+  #   command: ["-config.file=/etc/promtail/config.yml"]
+  #   volumes:
+  #     - ./observability/loki/promtail.yml:/etc/promtail/config.yml:ro
+  #     - /var/run/docker.sock:/var/run/docker.sock:ro
+  #   depends_on:
+  #     - loki
+  #   restart: unless-stopped
 
   grafana:
     image: grafana/grafana:12.1.1
