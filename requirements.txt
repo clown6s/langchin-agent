@@ -18,9 +18,6 @@ httpx
 elasticsearch
 pymilvus
 
-# 认证
-PyJWT
-
 # 可观测性
 structlog
 prometheus-client

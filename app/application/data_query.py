@@ -34,8 +34,7 @@ class DataQueryUseCase:
                state: ConversationState | None = None) -> CapabilityResult:
         """在已确认域上执行一次数据查询，返回结构化结果。"""
         metrics.nl2sql_total.labels("started").inc()
-        with span("query_data.answer", domain=domain,
-                  user_id=context.user_id or None):
+        with span("query_data.answer", domain=domain):
             result = self._answer(question, domain=domain, context=context,
                                   state=state)
         metrics.nl2sql_total.labels(result.status).inc()

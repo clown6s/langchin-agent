@@ -42,14 +42,13 @@ class StructlogAuditLogger:
                                conversation_id=conversation_id, payload=payload)
         logger.info("audit_event", event_id=event.event_id,
                     trace_id=event.trace_id, stage=event.stage,
-                    status=event.status, user_id=event.user_id,
+                    status=event.status,
                     conversation_id=event.conversation_id,
                     payload=_safe(event.payload))
 
     def record_event(self, event: AuditEvent) -> None:
         self.record(stage=event.stage, status=event.status,
-                    context=RequestContext(user_id=event.user_id,
-                                           trace_id=event.trace_id),
+                    context=RequestContext(trace_id=event.trace_id),
                     conversation_id=event.conversation_id,
                     payload=event.payload)
 

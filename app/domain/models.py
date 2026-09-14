@@ -15,12 +15,8 @@ from typing import Any
 # ---------- 请求上下文 ----------
 @dataclass(frozen=True)
 class RequestContext:
-    """一次请求的身份与权限上下文。"""
-    user_id: str = ""
-    roles: tuple[str, ...] = ()
+    """一次请求的追踪上下文（trace_id）。"""
     trace_id: str = ""
-    authenticated: bool = False
-    permissions: frozenset[str] = frozenset()
 
 
 @dataclass(frozen=True)
@@ -135,7 +131,6 @@ class AuditEvent:
     trace_id: str
     stage: str
     status: str
-    user_id: str = ""
     conversation_id: str | None = None
     payload: dict[str, Any] = field(default_factory=dict)
 
@@ -147,7 +142,7 @@ class AuditEvent:
         return cls(
             event_id=event_id or str(uuid4()),
             trace_id=context.trace_id or "",
-            stage=stage, status=status, user_id=context.user_id,
+            stage=stage, status=status,
             conversation_id=conversation_id, payload=payload)
 
 

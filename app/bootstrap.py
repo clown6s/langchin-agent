@@ -94,8 +94,3 @@ def _build_storage(settings: Settings):
     return catalog, MysqlReadonlyExecutor(
         catalog=catalog, host=q_host, port=q_port,
         user=q_user, password=q_password, database=q_db)
-
-
-def _anonymous_context():
-    from .domain.models import RequestContext
-    return RequestContext()

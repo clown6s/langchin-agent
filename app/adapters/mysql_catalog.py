@@ -13,32 +13,20 @@ class MysqlSchemaCatalog(SchemaCatalog):
                          cursorclass=pymysql.cursors.DictCursor,
                          charset="utf8mb4", autocommit=True)
 
-    def _denied_ids(self, user_id: str) -> set[str]:
-        with pymysql.connect(**self._dsn) as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    "SELECT domain_id FROM sql_domain_permissions "
-                    "WHERE subject_type='user' AND subject_id=%s AND allowed=0",
-                    (user_id,))
-                return {row["domain_id"] for row in cur.fetchall()}
-
     def domains(self, *, context: RequestContext) -> list[str]:
         with pymysql.connect(**self._dsn) as conn:
             with conn.cursor() as cur:
-                denied = self._denied_ids(context.user_id)
                 cur.execute("SELECT domain_id, domain_name FROM sql_data_domains "
                             "WHERE status='active' ORDER BY domain_name")
-                return [row["domain_name"] for row in cur.fetchall()
-                        if row["domain_id"] not in denied]
+                return [row["domain_name"] for row in cur.fetchall()]
 
     def describe(self, domain: str, *, context: RequestContext) -> str:
         with pymysql.connect(**self._dsn) as conn:
             with conn.cursor() as cur:
-                denied = self._denied_ids(context.user_id)
                 cur.execute("SELECT domain_id, description FROM sql_data_domains "
                             "WHERE domain_name=%s AND status='active' LIMIT 1", (domain,))
                 item = cur.fetchone()
-                if item is None or item["domain_id"] in denied:
+                if item is None:
                     return ""
                 cur.execute("SELECT table_name, column_name, business_name, data_type "
                             "FROM sql_allowed_columns WHERE domain_id=%s "
@@ -55,12 +43,11 @@ class MysqlSchemaCatalog(SchemaCatalog):
     def resolve(self, question: str, *, context: RequestContext) -> DomainResolution:
         with pymysql.connect(**self._dsn) as conn:
             with conn.cursor() as cur:
-                denied = self._denied_ids(context.user_id)
                 cur.execute("SELECT d.domain_name, d.domain_id, k.keyword, k.weight "
                             "FROM sql_domain_keywords k JOIN sql_data_domains d "
                             "ON d.domain_id=k.domain_id "
                             "WHERE d.status='active'")
-                rows = [r for r in cur.fetchall() if r["domain_id"] not in denied]
+                rows = cur.fetchall()
         scores: dict[str, float] = {}
         evidence: dict[str, list[str]] = {}
         for row in rows:
@@ -84,11 +71,10 @@ class MysqlSchemaCatalog(SchemaCatalog):
     def allowed_tables(self, domain: str, *, context: RequestContext) -> set[str]:
         with pymysql.connect(**self._dsn) as conn:
             with conn.cursor() as cur:
-                denied = self._denied_ids(context.user_id)
                 cur.execute("SELECT t.table_name, t.domain_id FROM sql_allowed_tables t "
                             "JOIN sql_data_domains d ON d.domain_id=t.domain_id "
                             "WHERE d.domain_name=%s AND d.status='active'", (domain,))
-                return {r["table_name"] for r in cur.fetchall() if r["domain_id"] not in denied}
+                return {r["table_name"] for r in cur.fetchall()}
 
     def allowed_columns(self, domain: str, *, context: RequestContext) -> dict[str, set[str]]:
         with pymysql.connect(**self._dsn) as conn:
@@ -104,11 +90,10 @@ class MysqlSchemaCatalog(SchemaCatalog):
     def column_capabilities(self, domain: str, *, context: RequestContext) -> dict:
         with pymysql.connect(**self._dsn) as conn:
             with conn.cursor() as cur:
-                denied = self._denied_ids(context.user_id)
                 cur.execute("SELECT d.domain_id FROM sql_data_domains d "
                             "WHERE d.domain_name=%s AND d.status='active' LIMIT 1", (domain,))
                 item = cur.fetchone()
-                if item is None or item["domain_id"] in denied:
+                if item is None:
                     return {}
                 cur.execute("SELECT table_name, column_name, selectable, filterable, sortable, "
                             "aggregatable, `sensitive` FROM sql_allowed_columns WHERE domain_id=%s",

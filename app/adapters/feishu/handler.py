@@ -4,15 +4,11 @@ from uuid import uuid4
 from ...application.chat import ChatCoordinator
 from ...domain.models import ChatRequest, RequestContext
 from .events import parse_text_event
-from .ports import FeishuClient, IdentityResolver
+from .ports import FeishuClient
 
 
 class FeishuMessageHandler:
-    def __init__(self, *, app_id: str,
-                 identity: IdentityResolver, client: FeishuClient,
-                 coordinator: ChatCoordinator):
-        self._app_id = app_id
-        self._identity = identity
+    def __init__(self, *, client: FeishuClient, coordinator: ChatCoordinator):
         self._client = client
         self._coordinator = coordinator
 
@@ -20,18 +16,10 @@ class FeishuMessageHandler:
         parsed = parse_text_event(event)
         if parsed is None:
             return False
-        context = self._identity.resolve(
-            app_id=self._app_id, open_id=parsed.open_id)
-        if context is None:
-            self._client.reply_text(parsed.message_id, "当前飞书账号尚未绑定，请联系管理员。")
-            return False
         request = ChatRequest(
             question=parsed.text,
             conversation_id=f"feishu:{parsed.chat_id}",
-            context=RequestContext(
-                user_id=context.user_id,
-                roles=context.roles, permissions=context.permissions,
-                authenticated=True, trace_id=parsed.trace_id or str(uuid4())),
+            context=RequestContext(trace_id=parsed.trace_id or str(uuid4())),
         )
         result = self._coordinator.ask(request)
         return self._client.reply_text(parsed.message_id, result.text)

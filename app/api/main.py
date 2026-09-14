@@ -2,12 +2,11 @@
 from collections.abc import Callable
 from contextlib import asynccontextmanager
 from dataclasses import replace
-from pathlib import Path
 from uuid import uuid4
 
 import structlog
-from fastapi import Depends, FastAPI, HTTPException, Request, status
-from fastapi.responses import HTMLResponse, Response, StreamingResponse
+from fastapi import Depends, FastAPI, Request
+from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel, Field
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
@@ -20,9 +19,6 @@ from ..observability.tracing import setup_tracing, shutdown_tracing, span
 from .sse import sse
 
 logger = structlog.get_logger(__name__)
-
-# 静态测试页所在目录（本项目根/scripts）。
-_SCRIPT_DIR = Path(__file__).resolve().parents[2] / "scripts"
 
 
 class ChatRequest(BaseModel):
@@ -38,10 +34,9 @@ class ChatResponse(BaseModel):
     conversation_id: str = ""
 
 
-def _no_auth_context() -> RequestContext:
-    """默认拒绝未配置认证的应用，禁止用请求头伪造身份。"""
-    raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
-                        detail="未配置认证提供方")
+def _anonymous_context() -> RequestContext:
+    """默认匿名请求上下文；trace_id 在请求处理时补全。"""
+    return RequestContext()
 
 
 @asynccontextmanager
@@ -56,8 +51,8 @@ async def _lifespan(_app: FastAPI):
 
 
 def create_app(coordinator: ChatCoordinator,
-               context_provider: Callable[[], RequestContext] = _no_auth_context) -> FastAPI:
-    """创建 API；context_provider 必须返回已验证身份生成的上下文。"""
+               context_provider: Callable[[], RequestContext] = _anonymous_context) -> FastAPI:
+    """创建 API；context_provider 提供请求上下文（默认匿名）。"""
     app = FastAPI(title="langchin-agent", lifespan=_lifespan)
 
     @app.middleware("http")
@@ -102,12 +97,6 @@ def create_app(coordinator: ChatCoordinator,
     async def health():
         return {"status": "ok"}
 
-    @app.get("/test")
-    async def test_page():
-        """流式对话测试页（同源，规避 CORS）。"""
-        page = _SCRIPT_DIR / "chat.html"
-        return HTMLResponse(page.read_text(encoding="utf-8"))
-
     @app.get("/metrics")
     async def metrics_endpoint():
         return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
@@ -115,9 +104,9 @@ def create_app(coordinator: ChatCoordinator,
     return app
 
 
-def make_agent_app(*, context_provider: Callable[[], RequestContext] = _no_auth_context,
+def make_agent_app(*, context_provider: Callable[[], RequestContext] = _anonymous_context,
                    enable_rag: bool = False) -> FastAPI:
-    """便捷工厂：装配 Agent，并显式注入认证上下文提供方。"""
+    """便捷工厂：装配 Agent，并显式注入请求上下文提供方。"""
     from ..adapters.audit import StructlogAuditLogger
     from ..adapters.memory_stores import (MemoryConversationStore,
                                           MemorySessionStateStore)
@@ -132,5 +121,5 @@ def make_agent_app(*, context_provider: Callable[[], RequestContext] = _no_auth_
     return create_app(coordinator, context_provider)
 
 
-# 通过 uvicorn 工厂或外部组合根创建 app；模块导入不再偷偷伪造用户身份。
+# 通过 uvicorn 工厂或外部组合根创建 app。
 app = make_agent_app()

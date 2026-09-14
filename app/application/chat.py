@@ -49,8 +49,7 @@ class ChatCoordinator:
                     conversation_id=conversation_id, payload={"question": question})
         metrics.agent_requests_total.labels("started").inc()
         try:
-            with span("chat.ask", conversation_id=conversation_id,
-                      user_id=context.user_id or None):
+            with span("chat.ask", conversation_id=conversation_id):
                 return self._ask_impl(request)
         except Exception:
             self._audit(stage="request", status="error", context=context,
@@ -60,7 +59,7 @@ class ChatCoordinator:
         finally:
             duration = perf_counter() - started
             logger.info("request_completed", conversation_id=conversation_id,
-                        user_id=context.user_id, duration_ms=int(duration * 1000))
+                        duration_ms=int(duration * 1000))
 
     def _ask_impl(self, request: ChatRequest) -> AgentAnswer:
         conversation_id = request.conversation_id
@@ -127,7 +126,7 @@ class ChatCoordinator:
                     conversation_id=conversation_id, payload={"question": question})
         metrics.agent_requests_total.labels("started").inc()
         logger.info("chat_stream_start", conversation_id=conversation_id,
-                    user_id=context.user_id, trace_id=context.trace_id,
+                    trace_id=context.trace_id,
                     question=question)
         try:
             yield from self._ask_stream_impl(request)
@@ -141,7 +140,7 @@ class ChatCoordinator:
         finally:
             duration = perf_counter() - started
             logger.info("chat_stream_done", conversation_id=conversation_id,
-                        user_id=context.user_id, trace_id=context.trace_id,
+                        trace_id=context.trace_id,
                         duration_ms=int(duration * 1000))
 
     def _ask_stream_impl(self, request: ChatRequest) -> Iterator[dict]:
