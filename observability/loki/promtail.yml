@@ -10,21 +10,55 @@ clients:
   - url: http://loki:3100/loki/api/v1/push
 
 scrape_configs:
-  - job_name: docker
+  - job_name: docker-containers
     docker_sd_configs:
       - host: unix:///var/run/docker.sock
         refresh_interval: 5s
     relabel_configs:
-      # 只采集应用容器，严格排除 Milvus、Loki 等其他容器
+      # 1) 只采集本项目容器，避免误收宿主机其它容器
       - source_labels:
-          - __meta_docker_container_name
-        regex: '/langchin-agent$'
+          - __meta_docker_container_label_com_docker_compose_project
+        regex: langchin-agent
         action: keep
-      # 写入统一的 container 标签
+      # 2) 排除 promtail 自身，避免自采自喂的日志循环
       - source_labels:
           - __meta_docker_container_name
-        regex: '^/(.*)$'
+        regex: /promtail$
+        action: drop
+      # 3) container = 去掉前导 "/" 的容器名
+      - source_labels:
+          - __meta_docker_container_name
+        regex: ^/(.*)$
         target_label: container
-      # 添加正确的 service_name 标签
-      - replacement: langchin-agent
+        replacement: $1
+      # 4) service_name：app 映射为 OTel 服务名 langchin-agent；其余 = 容器名
+      - source_labels:
+          - __meta_docker_container_name
+        regex: ^/(app)$
         target_label: service_name
+        replacement: langchin-agent
+      - source_labels:
+          - __meta_docker_container_name
+        regex: ^/(prometheus|tempo|loki|grafana)$
+        target_label: service_name
+        replacement: $1
+      # 5) compose service key，作为低基数辅助标签
+      - source_labels:
+          - __meta_docker_container_label_com_docker_compose_service
+        target_label: compose_service
+        replacement: $1
+    pipeline_stages:
+      # app 生产环境(ENV=prod)以 JSON 输出到 stdout；仅提取可解析字段为
+      # 结构化元数据（非索引标签），避免 label 基数膨胀。
+      - json:
+          expressions:
+            level: level
+            logger: logger
+            event: event
+      - structured_metadata:
+          level:
+            source: level
+          logger:
+            source: logger
+          event:
+            source: event

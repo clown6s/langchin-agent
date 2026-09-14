@@ -76,10 +76,29 @@
       "datasource": { "type": "loki", "uid": "loki" },
       "targets": [
         {
-          "expr": "{container=\"langchin-agent\"}",
+          "expr": "{service_name=~\"$service\"}",
           "refId": "A"
         }
       ]
     }
-  ]
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "service",
+        "type": "query",
+        "label": "服务",
+        "datasource": { "type": "loki", "uid": "loki" },
+        "query": {
+          "query": "label_values(service_name)",
+          "refId": "A"
+        },
+        "includeAll": false,
+        "multi": false,
+        "current": { "value": "langchin-agent", "text": "langchin-agent" },
+        "refresh": 1,
+        "sort": 1
+      }
+    ]
+  }
 }
