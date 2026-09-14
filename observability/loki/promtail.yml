@@ -20,10 +20,11 @@ scrape_configs:
           - __meta_docker_container_label_com_docker_compose_project
         regex: langchin-agent
         action: keep
-      # 2) 排除 promtail 自身，避免自采自喂的日志循环
+      # 2) 显式排除噪音/基础设施容器（Promtail 自身 + Milvus/etcd/redis/minio/mysql/neo4j）
+      #    这些不在本项目采集范围内，且日志又吵又占存储，统一 drop。
       - source_labels:
           - __meta_docker_container_name
-        regex: /promtail$
+        regex: /promtail$|/etcd|/minio|/redis|/mysql|/neo4j|/milvus
         action: drop
       # 3) container = 去掉前导 "/" 的容器名
       - source_labels:
