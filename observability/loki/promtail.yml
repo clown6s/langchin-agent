@@ -56,9 +56,6 @@ scrape_configs:
             logger: logger
             event: event
       - structured_metadata:
-          level:
-            source: level
-          logger:
-            source: logger
-          event:
-            source: event
+          level: level
+          logger: logger
+          event: event
