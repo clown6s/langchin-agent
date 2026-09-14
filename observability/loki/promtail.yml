@@ -31,18 +31,20 @@ scrape_configs:
         regex: ^/(.*)$
         target_label: container
         replacement: $1
-      # 4) service_name：app 映射为 OTel 服务名 langchin-agent；其余 = 容器名
+      # 4) service_name 兜底：凡未被显式映射的容器，一律用其容器名。
+      #    保证每一条被采集的流都有服务名，杜绝 unknown_service。
+      - source_labels:
+          - __meta_docker_container_name
+        regex: ^/(.+)$
+        target_label: service_name
+        replacement: $1
+      # 5) 特例覆盖：app 映射为 OTel 服务名 langchin-agent
       - source_labels:
           - __meta_docker_container_name
         regex: ^/(app)$
         target_label: service_name
         replacement: langchin-agent
-      - source_labels:
-          - __meta_docker_container_name
-        regex: ^/(prometheus|tempo|loki|grafana)$
-        target_label: service_name
-        replacement: $1
-      # 5) compose service key，作为低基数辅助标签
+      # 6) compose service key，作为低基数辅助标签
       - source_labels:
           - __meta_docker_container_label_com_docker_compose_service
         target_label: compose_service
