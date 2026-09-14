@@ -26,6 +26,12 @@ schema_config:
         period: 24h
 
 limits_config:
+  # 关闭 Loki 的 OTLP 接收端（HTTP /otlp/v1/logs 与 gRPC）。
+  # milvus 等容器自带 OTel 直接 OTLP 推日志时会绕过 promtail、落成 unknown_service；
+  # 日志统一走 promtail，这里关掉 OTLP 接收即可根除。
+  otlp_config:
+    receiver_http_enabled: false
+    receiver_grpc_enabled: false
   # 开启 Log volume 统计（Grafana 日志量面板需要）
   volume_enabled: true
   allow_structured_metadata: true
