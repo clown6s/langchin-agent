@@ -32,18 +32,18 @@ scrape_configs:
         regex: ^/(.*)$
         target_label: container
         replacement: $1
-      # 4) service_name 兜底：凡未被显式映射的容器，一律用其容器名。
-      #    保证每一条被采集的流都有服务名，杜绝 unknown_service。
+      # 4) service.name 兜底：凡未被显式映射的容器，一律用其容器名。
+      #    Grafana 按 OTel 语义用 service.name 分组，缺了这个就归入 unknown_service。
       - source_labels:
           - __meta_docker_container_name
         regex: ^/(.+)$
-        target_label: service_name
+        target_label: service.name
         replacement: $1
       # 5) 特例覆盖：app 映射为 OTel 服务名 langchin-agent
       - source_labels:
           - __meta_docker_container_name
         regex: ^/(app)$
-        target_label: service_name
+        target_label: service.name
         replacement: langchin-agent
       # 6) compose service key，作为低基数辅助标签
       - source_labels:
