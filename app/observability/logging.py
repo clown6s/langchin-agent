@@ -31,6 +31,10 @@ def setup_logging() -> None:
             structlog.processors.StackInfoRenderer(),
             structlog.processors.format_exc_info,
             structlog.processors.UnicodeDecoder(),
+            # 添加固定的 service_name
+            lambda logger, method_name, event_dict: event_dict.update(
+                service_name=os.getenv("OTEL_SERVICE_NAME", "langchin-agent")
+            ) or event_dict,
             _renderer(),
         ],
         wrapper_class=structlog.make_filtering_bound_logger(_level()),

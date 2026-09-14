@@ -25,10 +25,6 @@ scrape_configs:
           - __meta_docker_container_name
         regex: '^/(.*)$'
         target_label: container
-      # 删除日志中的 service_name 字段，防止自动提取
-      - source_labels:
-          - __service_name
-        action: labeldrop
       # 添加正确的 service_name 标签
       - replacement: langchin-agent
         target_label: service_name
