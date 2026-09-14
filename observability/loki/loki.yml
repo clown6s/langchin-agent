@@ -1,18 +1,6 @@
 # Loki 单机配置（文件存储）。app 日志经 Promtail 采集后推到这里。
 auth_enabled: false
 
-# 关闭 OTLP 直接接收（Loki 3.x 默认在 3100/otlp/v1/logs 收 OTLP 日志，
-# 会绕过 promtail 的采集/过滤规则，把 milvus 等自带 OTel 导出的日志打成 unknown_service）。
-# 日志统一走 promtail，这里显式拒收 OTLP。
-distributor:
-  receivers:
-    otlp:
-      protocols:
-        http:
-          endpoint: ""
-        grpc:
-          endpoint: ""
-
 server:
   http_listen_port: 3100
 
