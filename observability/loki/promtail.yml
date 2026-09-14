@@ -36,10 +36,10 @@ scrape_configs:
       - source_labels:
           - __meta_docker_container_label_com_docker_compose_service
         target_label: service_name
-      # 5) 特例：app → OTel 服务名 langchin-agent
+      # 5) 特例：app 容器（container_name=langchin-agent）→ 服务名 langchin-agent
       - source_labels:
           - __meta_docker_container_name
-        regex: ^/app$
+        regex: ^/langchin-agent$
         target_label: service_name
         replacement: langchin-agent
       # 6) compose_service 辅助标签
