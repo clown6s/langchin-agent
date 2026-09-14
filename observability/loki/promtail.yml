@@ -20,45 +20,29 @@ scrape_configs:
           - __meta_docker_container_label_com_docker_compose_project
         regex: langchin-agent
         action: keep
-      # 2) 显式排除噪音/基础设施容器（Promtail 自身 + Milvus/etcd/redis/minio/mysql/neo4j）
-      #    这些不在本项目采集范围内，且日志又吵又占存储，统一 drop。
+      # 2) 只保留真正想看日志的服务；基础设施（mysql/etcd/minio/milvus/promtail 等）全部丢弃。
+      #    用 compose service 标签过滤（比容器名更可靠），milvus 的 service=milvus 直接不采集。
       - source_labels:
-          - __meta_docker_container_name
-        regex: /promtail$|/etcd|/minio|/redis|/mysql|/neo4j|/milvus
-        action: drop
-      # 3) container = 去掉前导 "/" 的容器名
+          - __meta_docker_container_label_com_docker_compose_service
+        regex: app|grafana|tempo|loki|prometheus
+        action: keep
+      # 3) container 标签：去掉前导 "/"
       - source_labels:
           - __meta_docker_container_name
         regex: ^/(.*)$
         target_label: container
         replacement: $1
-      # 4) service.name 兜底：凡未被显式映射的容器，一律用其容器名。
-      #    Grafana 按 OTel 语义用 service.name 分组，缺了这个就归入 unknown_service。
+      # 4) service.name：Grafana 按此分组（缺了就归入 unknown_service）
       - source_labels:
-          - __meta_docker_container_name
-        regex: ^/(.+)$
+          - __meta_docker_container_label_com_docker_compose_service
         target_label: service.name
-        replacement: $1
-      # 5) 特例覆盖：app 映射为 OTel 服务名 langchin-agent
+      # 5) 特例：app → OTel 服务名 langchin-agent
       - source_labels:
           - __meta_docker_container_name
-        regex: ^/(app)$
+        regex: ^/app$
         target_label: service.name
         replacement: langchin-agent
-      # 6) compose service key，作为低基数辅助标签
+      # 6) compose_service 辅助标签
       - source_labels:
           - __meta_docker_container_label_com_docker_compose_service
         target_label: compose_service
-        replacement: $1
-    pipeline_stages:
-      # app 生产环境(ENV=prod)以 JSON 输出到 stdout；仅提取可解析字段为
-      # 结构化元数据（非索引标签），避免 label 基数膨胀。
-      - json:
-          expressions:
-            level: level
-            logger: logger
-            event: event
-      - structured_metadata:
-          level: level
-          logger: logger
-          event: event
