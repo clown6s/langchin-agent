@@ -18,7 +18,7 @@ scrape_configs:
       # 只采集应用容器，严格排除 Milvus、Loki 等其他容器
       - source_labels:
           - __meta_docker_container_name
-        regex: 'langchin-agent'
+        regex: '/langchin-agent$'
         action: keep
       # 写入统一的 container 标签
       - source_labels:
