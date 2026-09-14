@@ -31,9 +31,3 @@ metrics_generator:
   ring:
     kvstore:
       store: inmemory
-
-overrides:
-  defaults:
-    metrics_generator_processors: [service-graphs, span-metrics]
-    metrics_generator_max_active_series: 1000
-    metrics_generator_max_series_per_shard: 100
