@@ -25,3 +25,6 @@ scrape_configs:
           - __meta_docker_container_name
         regex: '^/(.*)$'
         target_label: container
+      # 覆盖 service_name 标签为已知值
+      - replacement: langchin-agent
+        target_label: service_name
