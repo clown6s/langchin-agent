@@ -1,4 +1,4 @@
-# Tempo — 分布式链路后端（本地存储）。
+# Tempo — 分布式链路后端（本地存储，仅普通 trace，无 metrics-generator）。
 server:
   http_listen_port: 3200
   grpc_listen_port: 9095
@@ -19,15 +19,3 @@ storage:
       path: /var/tempo/traces
     wal:
       path: /var/tempo/wal
-
-metrics_generator:
-  storage:
-    path: /var/tempo/metrics
-    remote_write: []
-  registry:
-    external_labels:
-      cluster: local
-  # ring kvstore：单机用 inmemory，让 metrics-generator 注册进 ring，解决 "empty ring"。
-  ring:
-    kvstore:
-      store: inmemory
