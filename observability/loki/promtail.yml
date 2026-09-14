@@ -32,15 +32,15 @@ scrape_configs:
         regex: ^/(.*)$
         target_label: container
         replacement: $1
-      # 4) service.name：Grafana 按此分组（缺了就归入 unknown_service）
+      # 4) service_name：Grafana 按此分组（缺了就归入 unknown_service）
       - source_labels:
           - __meta_docker_container_label_com_docker_compose_service
-        target_label: service.name
+        target_label: service_name
       # 5) 特例：app → OTel 服务名 langchin-agent
       - source_labels:
           - __meta_docker_container_name
         regex: ^/app$
-        target_label: service.name
+        target_label: service_name
         replacement: langchin-agent
       # 6) compose_service 辅助标签
       - source_labels:
